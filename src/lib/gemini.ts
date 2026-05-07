@@ -192,7 +192,7 @@ export async function* sendMessageStream(
   let useProxy1 = !!(aiConfig.proxy1 && aiConfig.proxy1.url && aiConfig.proxy1.key);
   let useProxy2 = !!(aiConfig.proxy2 && aiConfig.proxy2.url && aiConfig.proxy2.key);
 
-  const dynamicPrompt1 = `${SYSTEM_PROMPT}${summaryContext}\n\n[CẤU HÌNH HIỆN TẠI]\n- Thể loại (Kết hợp): ${gameConfig.genre}\n- Văn phong tác giả: ${gameConfig.style}\n- Góc nhìn (Perspective): ${gameConfig.perspective} (Sử dụng cách xưng hô Tôi-Bạn-Hắn chính xác theo lựa chọn này)\n- Yêu cầu độ dài Tường thuật chính: Khoảng ${gameConfig.wordCount} từ (Không tính phần World Pulse và JSON). Hãy miêu tả cực kỳ chi tiết để đạt đủ số lượng từ này.${useProxy2 ? '\n\n[LƯU Ý DÀNH CHO PROXY 1]: BẠN SẼ CHỈ TẬP TRUNG VIẾT VĂN TƯỜNG THUẬT VÀ LOGIC HÀNH ĐỘNG. BỎ QUA YÊU CẦU TRẢ VỀ STATE_UPDATE JSON. TUYỆT ĐỐI KHÔNG TRẢ VỀ ===STATE_UPDATE===.' : ''}`;
+  const dynamicPrompt1 = `${SYSTEM_PROMPT}${summaryContext}\n\n[CẤU HÌNH HIỆN TẠI]\n- Thể loại (Kết hợp): ${gameConfig.genre}\n- Văn phong tác giả: ${gameConfig.style}\n- Góc nhìn (Perspective): ${gameConfig.perspective} (Sử dụng cách xưng hô Tôi-Bạn-Hắn chính xác theo lựa chọn này)\n- Yêu cầu độ dài Tường thuật chính: Khoảng ${gameConfig.wordCount} từ (Không tính phần World Pulse và JSON). Hãy miêu tả cực kỳ chi tiết để đạt đủ số lượng từ này.${useProxy2 ? '\n\n[LƯU Ý DÀNH CHO PROXY 1]: BẠN LÀ PROXY 1. BẠN CHỈ ĐƯỢC PHÉP VIẾT VĂN BẢN TƯỜNG THUẬT. NGHIÊM CẤM VIẾT BẤT KỲ KHỐI MÃ CODE NÀO NGAY CẢ DƯỚI DẠNG MARKDOWN HAY RAW JSON. TUYỆT ĐỐI KHÔNG TRẢ VỀ ===STATE_UPDATE===.' : ''}`;
   
   const dynamicPrompt2 = `${SYSTEM_PROMPT}${summaryContext}\n\n[CẤU HÌNH HIỆN TẠI]\n- Thể loại (Kết hợp): ${gameConfig.genre}\n- Văn phong tác giả: ${gameConfig.style}\n- Góc nhìn (Perspective): ${gameConfig.perspective}\n\n[LƯU Ý DÀNH CHO PROXY 2]: BẠN LÀ HỆ THỐNG XỬ LÝ BACKGROUND. DỰA VÀO HÀNH ĐỘNG CỦA NGƯỜI CHƠI VÀ BỐI CẢNH, BẠN CHỈ ĐƯỢC PHÉP TRẢ VỀ KHỐI ===STATE_UPDATE===...===END_STATE_UPDATE=== CHỨA TOÀN BỘ CẬP NHẬT JSON CỦA NHÂN VẬT VÀ LỊCH SỬ. KHÔNG ĐƯỢC PHÉP TRẢ VỀ BẤT KỲ ĐOẠN VĂN NÀO KHÁC.`;
 
@@ -296,8 +296,16 @@ export async function* sendMessageStream(
             if (match) {
               yield `\n\n${match[0]}`;
             } else {
-              const jsonMatch = bgState.match(/```(?:json)?\n([\s\S]*?)\n```/);
-              if (jsonMatch) yield `\n\n===STATE_UPDATE===\n${jsonMatch[1]}\n===END_STATE_UPDATE===`;
+              const jsonMatch = bgState.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+              if (jsonMatch) {
+                yield `\n\n===STATE_UPDATE===\n${jsonMatch[1]}\n===END_STATE_UPDATE===`;
+              } else {
+                // Backup: if it's just raw JSON mapping starting with { and ending with }
+                const rawJsonMatch = bgState.match(/\{[\s\S]*\}/);
+                if (rawJsonMatch) {
+                  yield `\n\n===STATE_UPDATE===\n${rawJsonMatch[0]}\n===END_STATE_UPDATE===`;
+                }
+              }
             }
           }
           return;
@@ -360,8 +368,16 @@ export async function* sendMessageStream(
         if (match) {
           yield `\n\n${match[0]}`;
         } else {
-          const jsonMatch = bgState.match(/```(?:json)?\n([\s\S]*?)\n```/);
-          if (jsonMatch) yield `\n\n===STATE_UPDATE===\n${jsonMatch[1]}\n===END_STATE_UPDATE===`;
+          const jsonMatch = bgState.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (jsonMatch) {
+            yield `\n\n===STATE_UPDATE===\n${jsonMatch[1]}\n===END_STATE_UPDATE===`;
+          } else {
+            // Backup: if it's just raw JSON mapping starting with { and ending with }
+            const rawJsonMatch = bgState.match(/\{[\s\S]*\}/);
+            if (rawJsonMatch) {
+              yield `\n\n===STATE_UPDATE===\n${rawJsonMatch[0]}\n===END_STATE_UPDATE===`;
+            }
+          }
         }
       }
       return; // Success, exit the generator

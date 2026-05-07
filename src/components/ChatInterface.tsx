@@ -245,12 +245,13 @@ export default function ChatInterface() {
         fullContent += chunk;
         
         let displayContent = fullContent;
-        const stateMatch = fullContent.match(/===STATE_UPDATE===\n([\s\S]*?)\n===END_STATE_UPDATE===/);
-        if (stateMatch) {
-          displayContent = fullContent.replace(/===STATE_UPDATE===\n[\s\S]*?\n===END_STATE_UPDATE===/, '').trim();
-        } else if (fullContent.includes('===STATE_UPDATE===')) {
-           displayContent = fullContent.split('===STATE_UPDATE===')[0].trim();
-        }
+        // Loại bỏ mọi chuỗi json update trạng thái
+        displayContent = displayContent.replace(/===STATE_UPDATE===[\s\S]*?(?:===END_STATE_UPDATE===|$)/g, '');
+        // Loại bỏ các đoạn code block JSON không mong muốn ở cuối
+        displayContent = displayContent.replace(/```(?:json)?\s*\{[\s\S]*?(?:```|$)/gi, '');
+        // Loại bỏ bare JSON rò rỉ nếu AI không dùng Markdown code block
+        displayContent = displayContent.replace(/\{[\s\S]*?"(character|inventory|currentLocation|relationships)"[\s\S]*\}(?:\s*)$/i, '');
+        displayContent = displayContent.trim();
 
         // Fallback: Clean up unwanted labels if AI still generates them
         displayContent = displayContent
@@ -273,7 +274,7 @@ export default function ChatInterface() {
         }
       }
 
-      const finalMatches = Array.from(fullContent.matchAll(/===STATE_UPDATE===\n([\s\S]*?)\n===END_STATE_UPDATE===/g));
+      const finalMatches = Array.from(fullContent.matchAll(/===STATE_UPDATE===\s*([\s\S]*?)\s*(?:===END_STATE_UPDATE===|$)/g));
       if (finalMatches.length > 0) {
         const lastMatch = finalMatches[finalMatches.length - 1];
         if (lastMatch && lastMatch[1]) {
